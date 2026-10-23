@@ -126,9 +126,15 @@ def main():
             if probe_bot:
                 if test_message_id or inspect_only:
                     raise ValueError("PROBE_BOT cannot be combined with TEST_MESSAGE_ID or INSPECT_ONLY")
-                probe_text = "قناة #اليمن_نت\n" + " ".join(f"فحص {i:03d}" for i in range(1, 158))
+                probe_result = client.get_messages(source, ids=319910)
+                probe_message = probe_result[0] if isinstance(probe_result, (list, tuple)) else probe_result
+                rich = getattr(probe_message, "rich_message", None)
+                body = rich_message_text(getattr(rich, "blocks", None)) if rich is not None else ""
+                if not body:
+                    raise RuntimeError("Source probe has no rich text")
+                probe_text = "قناة #اليمن_نت\n" + body
                 sent = client.send_message(target, probe_text, parse_mode=None)
-                print({"mode": "non_publishing_bot_probe", "message_id": sent.id, "sent": True})
+                print({"mode": "non_publishing_bot_probe", "message_id": sent.id, "text_length": len(probe_text), "sent": True})
                 return
             if inspect_only and not test_message_id:
                 raise ValueError("INSPECT_ONLY requires TEST_MESSAGE_ID")
