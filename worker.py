@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -292,6 +293,7 @@ def main():
                 m for m in messages
                 if m.id > cursor and not isinstance(m, MessageService)
             ]
+            last_send_at = 0.0
             for message in messages:
                 if not claim(message.id):
                     continue
@@ -307,7 +309,11 @@ def main():
                            "skipped_by_ledger": ledger.get("status")})
                     continue
                 try:
+                    delay = 1.1 - (time.monotonic() - last_send_at) if last_send_at else 0.0
+                    if delay > 0:
+                        time.sleep(delay)
                     copy_to_bot(client, target, source, message)
+                    last_send_at = time.monotonic()
                     delivery_transition(message.id, "mtproto", owner, "mtproto_handoff")
                     finish(message.id, True)
                     copied += 1
