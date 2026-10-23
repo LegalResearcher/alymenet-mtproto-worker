@@ -120,9 +120,16 @@ def strip_source_promo_footer(text):
             break
     suffix = lines[suffix_start:]
     if suffix and any(alias.search(item) for item in suffix) and any(re.search(r"t\.me/", item, re.IGNORECASE) for item in suffix):
-        if suffix_start > 0 and re.fullmatch(r"ـ{5,}", lines[suffix_start - 1].strip()):
-            suffix_start -= 1
-        return "\n".join(lines[:suffix_start]).rstrip()
+        footer_start = suffix_start
+        yemen_net = re.compile(r"اليمن[\s\u200b\u200c\u200d_ـ-]*نت", re.IGNORECASE)
+        promo_marker = re.compile(r"قناة|رسمي|موثوق|تيلي|تلي|روابط?|الرابط|اشتراك", re.IGNORECASE)
+        for index in range(suffix_start - 1, max(-1, suffix_start - 9), -1):
+            if yemen_net.search(lines[index]) and any(promo_marker.search(item) for item in lines[index:suffix_start]):
+                footer_start = index
+                break
+        if footer_start > 0 and re.fullmatch(r"ـ{5,}", lines[footer_start - 1].strip()):
+            footer_start -= 1
+        return "\n".join(lines[:footer_start]).rstrip()
     return text
 
 
