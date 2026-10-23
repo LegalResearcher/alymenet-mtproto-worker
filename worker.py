@@ -136,10 +136,13 @@ def main():
                     media = getattr(message, "media", None)
                     rich = getattr(message, "rich_message", None)
                     blocks = getattr(rich, "blocks", []) if rich is not None else []
+                    session_user = client.get_me()
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
                         "message_id": message_id,
+                        "session_account_is_bot": bool(getattr(session_user, "bot", False)),
+                        "target_is_bot": bool(getattr(target, "bot", False)),
                         "message_class": type(message).__name__,
                         "rich_message_class": type(rich).__name__ if rich is not None else None,
                         "rich_block_classes": [type(block).__name__ for block in blocks[:30]],
