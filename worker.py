@@ -105,6 +105,13 @@ def bot_username():
     return data["result"]["username"]
 
 
+def source_photos_enabled():
+    rows = db(
+        "alymenet_bot_settings?setting_key=eq.source_photos_enabled&select=enabled&limit=1"
+    ).json()
+    return rows[0].get("enabled") is True if rows else True
+
+
 def rich_message_text(node, depth=0):
     """Flatten Telegram RichMessage blocks to their visible text only."""
     if node is None or depth > 12:
@@ -163,33 +170,64 @@ def strip_source_promo_footer(text):
     return text
 
 
-def copy_to_bot(client, target, source, message):
+def is_image_message(message):
+    if getattr(message, "photo", None) is not None:
+        return True
+    document = getattr(message, "document", None)
+    if document is None:
+        return False
+    if str(getattr(document, "mime_type", "") or "").lower().startswith("image/"):
+        return True
+    for attribute in getattr(document, "attributes", []) or []:
+        filename = getattr(attribute, "file_name", "") or ""
+        if re.search(r"\.(?:jpe?g|png|webp|bmp|tiff?)$", filename, re.IGNORECASE):
+            return True
+    return False
+
+
+def copy_to_bot(client, target, source, message, photos_enabled=True):
     rich = getattr(message, "rich_message", None)
     if rich is not None:
-        if getattr(rich, "photos", None) or getattr(rich, "documents", None):
+        rich_has_media = bool(getattr(rich, "photos", None) or getattr(rich, "documents", None))
+        if rich_has_media and photos_enabled:
             raise RuntimeError("RichMessage contains embedded media not supported by the inbox text bridge")
         text = strip_source_promo_footer(rich_message_text(getattr(rich, "blocks", None))).strip()
         if not text:
+            if rich_has_media and not photos_enabled:
+                return False
             raise RuntimeError("RichMessage contained no extractable text")
         # Bot API's inbox handler only accepts ordinary text/captions and known
         # media fields, so convert this new rich-message type to plain text.
         client.send_message(target, text, parse_mode=None)
-        return
+        return True
+    if not photos_enabled and is_image_message(message):
+        text = strip_source_promo_footer(getattr(message, "raw_text", "") or "").strip()
+        if not text:
+            return False
+        client.send_message(target, text, parse_mode=None)
+        return True
     # For regular Telegram messages, drop_author copies the complete server-side
     # payload (including supported media) without a forwarded-from header.
     client.forward_messages(target, message, from_peer=source, drop_author=True)
+    return True
 
 
 def main():
     cursor = get_cursor()
     client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
     copied = 0
+    skipped_photos = 0
     try:
         with client:
             if not client.is_user_authorized():
                 raise RuntimeError("TELEGRAM_SESSION_STRING is not authorized")
             source = client.get_entity(SOURCE)
             target = client.get_entity(bot_username())
+            try:
+                photos_enabled = source_photos_enabled()
+            except Exception as error:
+                photos_enabled = False
+                print({"photo_setting_read_error": str(error), "photos_enabled": False})
             test_message_id = os.environ.get("TEST_MESSAGE_ID", "").strip()
             inspect_only = os.environ.get("INSPECT_ONLY", "").lower() in {"1", "true", "yes"}
             export_text = os.environ.get("EXPORT_TEXT", "").lower() in {"1", "true", "yes"}
@@ -278,9 +316,12 @@ def main():
                            "copied": False, "skipped_by_ledger": ledger.get("status")})
                     return
                 try:
-                    copy_to_bot(client, target, source, message)
-                    delivery_transition(message_id, "mtproto", owner, "mtproto_handoff")
-                    print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id, "copied": True})
+                    delivered = copy_to_bot(client, target, source, message, photos_enabled=photos_enabled)
+                    status = "mtproto_handoff" if delivered else "skipped"
+                    detail = None if delivered else "Photos are disabled and the source post has no text caption"
+                    delivery_transition(message_id, "mtproto", owner, status, detail)
+                    print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id,
+                           "copied": delivered, "skipped_photos": not delivered})
                 except Exception as error:
                     try:
                         delivery_transition(message_id, "mtproto", owner, "uncertain", str(error))
@@ -312,11 +353,16 @@ def main():
                     delay = 1.1 - (time.monotonic() - last_send_at) if last_send_at else 0.0
                     if delay > 0:
                         time.sleep(delay)
-                    copy_to_bot(client, target, source, message)
+                    delivered = copy_to_bot(client, target, source, message, photos_enabled=photos_enabled)
                     last_send_at = time.monotonic()
-                    delivery_transition(message.id, "mtproto", owner, "mtproto_handoff")
+                    status = "mtproto_handoff" if delivered else "skipped"
+                    detail = None if delivered else "Photos are disabled and the source post has no text caption"
+                    delivery_transition(message.id, "mtproto", owner, status, detail)
                     finish(message.id, True)
-                    copied += 1
+                    if delivered:
+                        copied += 1
+                    else:
+                        skipped_photos += 1
                 except Exception as error:
                     try:
                         delivery_transition(message.id, "mtproto", owner, "uncertain", str(error))
@@ -326,7 +372,8 @@ def main():
                     raise
     finally:
         client.disconnect()
-    print({"source": SOURCE, "cursor": cursor, "inspected": len(messages), "copied": copied})
+    print({"source": SOURCE, "cursor": cursor, "inspected": len(messages), "copied": copied,
+           "skipped_photos": skipped_photos})
 
 
 if __name__ == "__main__":
