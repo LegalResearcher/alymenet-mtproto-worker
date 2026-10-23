@@ -98,13 +98,26 @@ def main():
                     raise RuntimeError(f"Source message {message_id} was not found")
                 if inspect_only:
                     media = getattr(message, "media", None)
+                    raw_message = message.to_dict() if hasattr(message, "to_dict") else {}
+                    hidden_fields = {"message", "media", "entities", "from_id", "peer_id", "saved_peer_id", "fwd_from"}
+                    optional_objects = {}
+                    for field in ("action", "reply_markup", "suggested_post", "factcheck", "replies", "reactions"):
+                        value = getattr(message, field, None)
+                        if value is not None:
+                            optional_objects[field] = type(value).__name__
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
                         "message_id": message_id,
                         "message_class": type(message).__name__,
+                        "telegram_constructor": raw_message.get("_"),
+                        "present_fields": sorted(
+                            key for key, value in raw_message.items()
+                            if value is not None and key not in hidden_fields and key != "_"
+                        ),
                         "media_class": type(media).__name__ if media is not None else None,
                         "media_fields": sorted(vars(media).keys()) if media is not None and hasattr(media, "__dict__") else [],
+                        "optional_object_classes": optional_objects,
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
                     })
