@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timezone
 
 import requests
@@ -93,12 +94,32 @@ def rich_message_text(node, depth=0):
     return "\n".join(parts)
 
 
+def strip_source_promo_footer(text):
+    lines = text.splitlines()
+    header = re.compile(r"قناة\s*#?\s*اليمن[\s_ـ-]*نت.*(?:تيليجرام|تليجرام|تلغرام|روابط?|الرابط)", re.IGNORECASE)
+    alias = re.compile(r"ALYEMENNET|ALYMENET|YEMENNET|YMENET", re.IGNORECASE)
+    for index, line in enumerate(lines):
+        if not header.search(line):
+            continue
+        tail = lines[index + 1:]
+        has_alias = any(alias.search(item) for item in tail)
+        footer_only = all(
+            not item.strip() or alias.search(item) or re.fullmatch(r"[\s\W_]+", item)
+            for item in tail
+        )
+        if has_alias and footer_only:
+            if index > 0 and re.fullmatch(r"ـ{5,}", lines[index - 1].strip()):
+                index -= 1
+            return "\n".join(lines[:index]).rstrip()
+    return text
+
+
 def copy_to_bot(client, target, source, message):
     rich = getattr(message, "rich_message", None)
     if rich is not None:
         if getattr(rich, "photos", None) or getattr(rich, "documents", None):
             raise RuntimeError("RichMessage contains embedded media not supported by the inbox text bridge")
-        text = rich_message_text(getattr(rich, "blocks", None)).strip()
+        text = strip_source_promo_footer(rich_message_text(getattr(rich, "blocks", None))).strip()
         if not text:
             raise RuntimeError("RichMessage contained no extractable text")
         # Bot API's inbox handler only accepts ordinary text/captions and known
