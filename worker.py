@@ -99,6 +99,24 @@ def main():
                 if inspect_only:
                     media = getattr(message, "media", None)
                     raw_message = message.to_dict() if hasattr(message, "to_dict") else {}
+                    def shape(value, depth=0):
+                        if value is None:
+                            return None
+                        if isinstance(value, str):
+                            return {"type": "str", "length": len(value)}
+                        if depth >= 7:
+                            return {"type": type(value).__name__, "truncated": True}
+                        if isinstance(value, (list, tuple)):
+                            result = [shape(item, depth + 1) for item in value[:20]]
+                            if len(value) > 20:
+                                result.append({"omitted_items": len(value) - 20})
+                            return result
+                        if hasattr(value, "__dict__"):
+                            return {
+                                "type": type(value).__name__,
+                                "fields": {key: shape(item, depth + 1) for key, item in vars(value).items()},
+                            }
+                        return {"type": type(value).__name__}
                     hidden_fields = {"message", "media", "entities", "from_id", "peer_id", "saved_peer_id", "fwd_from"}
                     optional_objects = {}
                     for field in ("action", "reply_markup", "suggested_post", "factcheck", "replies", "reactions"):
@@ -111,6 +129,7 @@ def main():
                         "message_id": message_id,
                         "message_class": type(message).__name__,
                         "telegram_constructor": raw_message.get("_"),
+                        "rich_message_shape": shape(getattr(message, "rich_message", None)),
                         "present_fields": sorted(
                             key for key, value in raw_message.items()
                             if value is not None and key not in hidden_fields and key != "_"
