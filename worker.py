@@ -135,64 +135,16 @@ def main():
                 if inspect_only:
                     media = getattr(message, "media", None)
                     rich = getattr(message, "rich_message", None)
-                    raw_message = message.to_dict() if hasattr(message, "to_dict") else {}
-                    def shape(value, depth=0):
-                        if value is None:
-                            return None
-                        if isinstance(value, str):
-                            return {"type": "str", "length": len(value)}
-                        if depth >= 7:
-                            return {"type": type(value).__name__, "truncated": True}
-                        if isinstance(value, (list, tuple)):
-                            result = [shape(item, depth + 1) for item in value[:20]]
-                            if len(value) > 20:
-                                result.append({"omitted_items": len(value) - 20})
-                            return result
-                        if hasattr(value, "__dict__"):
-                            return {
-                                "type": type(value).__name__,
-                                "fields": {key: shape(item, depth + 1) for key, item in vars(value).items()},
-                            }
-                        return {"type": type(value).__name__}
-                    hidden_fields = {"message", "media", "entities", "from_id", "peer_id", "saved_peer_id", "fwd_from"}
-                    optional_objects = {}
-                    for field in ("action", "reply_markup", "suggested_post", "factcheck", "replies", "reactions"):
-                        value = getattr(message, field, None)
-                        if value is not None:
-                            optional_objects[field] = type(value).__name__
-                    bot_history = client.get_messages(target, limit=3)
-                    webhook_response = requests.get(
-                        f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo", timeout=30
-                    )
-                    webhook_data = webhook_response.json().get("result", {}) if webhook_response.ok else {}
+                    blocks = getattr(rich, "blocks", []) if rich is not None else []
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
                         "message_id": message_id,
-                        "sender_allowed_by_inbox": str(client.get_me().id) in {"85820797", "1550781818", "672436755"},
                         "message_class": type(message).__name__,
-                        "telegram_constructor": raw_message.get("_"),
-                        "rich_message_shape": shape(getattr(message, "rich_message", None)),
+                        "rich_message_class": type(rich).__name__ if rich is not None else None,
+                        "rich_block_classes": [type(block).__name__ for block in blocks[:30]],
                         "rich_text_length": len(rich_message_text(getattr(rich, "blocks", None))) if rich is not None else 0,
-                        "present_fields": sorted(
-                            key for key, value in raw_message.items()
-                            if value is not None and key not in hidden_fields and key != "_"
-                        ),
                         "media_class": type(media).__name__ if media is not None else None,
-                        "media_fields": sorted(vars(media).keys()) if media is not None and hasattr(media, "__dict__") else [],
-                        "optional_object_classes": optional_objects,
-                        "bot_chat_recent": [
-                            {"id": item.id, "outgoing": bool(item.out), "text_length": len(item.raw_text or "")}
-                            for item in bot_history
-                        ],
-                        "bot_webhook": {
-                            "points_to_inbox": str(webhook_data.get("url", "")).endswith("/functions/v1/alymenet-bot-inbox"),
-                            "pending_update_count": webhook_data.get("pending_update_count"),
-                            "allowed_updates": webhook_data.get("allowed_updates"),
-                            "last_error_date": webhook_data.get("last_error_date"),
-                            "has_last_error": bool(webhook_data.get("last_error_message")),
-                            "last_error_message": str(webhook_data.get("last_error_message", "")).replace(str(webhook_data.get("url", "")), "[webhook-url]")[:180],
-                        },
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
                     })
