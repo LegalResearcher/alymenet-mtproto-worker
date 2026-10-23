@@ -122,6 +122,13 @@ def main():
             target = client.get_entity(bot_username())
             test_message_id = os.environ.get("TEST_MESSAGE_ID", "").strip()
             inspect_only = os.environ.get("INSPECT_ONLY", "").lower() in {"1", "true", "yes"}
+            probe_bot = os.environ.get("PROBE_BOT", "").lower() in {"1", "true", "yes"}
+            if probe_bot:
+                if test_message_id or inspect_only:
+                    raise ValueError("PROBE_BOT cannot be combined with TEST_MESSAGE_ID or INSPECT_ONLY")
+                sent = client.send_message(target, "/start", parse_mode=None)
+                print({"mode": "non_publishing_bot_probe", "message_id": sent.id, "sent": True})
+                return
             if inspect_only and not test_message_id:
                 raise ValueError("INSPECT_ONLY requires TEST_MESSAGE_ID")
             if test_message_id:
