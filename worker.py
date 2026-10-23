@@ -5,7 +5,6 @@ import requests
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.patched import MessageService
-from telethon.tl.types import MessageMediaWebPage
 
 SOURCE = "ALYEMENNET"
 STATE_TABLE = "alymenet_mtproto_state"
@@ -96,10 +95,7 @@ def main():
                     continue
                 try:
                     try:
-                        if message.raw_text and (
-                            message.media is None
-                            or isinstance(message.media, MessageMediaWebPage)
-                        ):
+                        if message.raw_text:
                             client.send_message(target, message.raw_text)
                         else:
                             client.forward_messages(target, message, from_peer=source)
