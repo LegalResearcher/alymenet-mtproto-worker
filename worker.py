@@ -126,7 +126,7 @@ def main():
             if probe_bot:
                 if test_message_id or inspect_only:
                     raise ValueError("PROBE_BOT cannot be combined with TEST_MESSAGE_ID or INSPECT_ONLY")
-                probe_text = "قناة #اليمن_نت\n" + ("اختبار " * 180)
+                probe_text = "قناة #اليمن_نت\n" + " ".join(f"فحص {i:03d}" for i in range(1, 158))
                 sent = client.send_message(target, probe_text, parse_mode=None)
                 print({"mode": "non_publishing_bot_probe", "message_id": sent.id, "sent": True})
                 return
