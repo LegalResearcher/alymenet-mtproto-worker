@@ -239,7 +239,8 @@ def main():
                         "media_class": type(media).__name__ if media is not None else None,
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
-                        "extracted_text": clean_source_text if export_text else None,
+                        "extracted_text": source_text if export_text else None,
+                        "cleaned_extracted_text": clean_source_text if export_text else None,
                     })
                     return
                 nonce = f"{message_id}-{int(datetime.now(timezone.utc).timestamp())}"
