@@ -95,7 +95,10 @@ def main():
                     continue
                 try:
                     try:
-                        client.forward_messages(target, message, from_peer=source)
+                        if message.raw_text and not message.media:
+                            client.send_message(target, message.raw_text)
+                        else:
+                            client.forward_messages(target, message, from_peer=source)
                     except Exception:
                         text = (message.raw_text or "").strip()
                         if not text:
