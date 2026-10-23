@@ -1,6 +1,6 @@
 # ALYEMENNET MTProto bridge
 
-This public repository contains a scheduled GitHub Actions worker that signs in with a Telegram user session, reads new posts from `ALYEMENNET`, and copies them to the Telegram bot used by the Hasad Alyoum inbox without a forwarded-from header. It uses Telethon's server-side copy behavior so captions, formatting, and supported media are not reduced to plain text. The existing Supabase inbox remains responsible for the current filtering, cleaning, deduplication, media handling, and footer.
+This public repository contains a scheduled GitHub Actions worker that signs in with a Telegram user session, reads new posts from `ALYEMENNET`, and copies them to the Telegram bot used by the Hasad Alyoum inbox without a forwarded-from header. It uses Telethon's server-side copy behavior so captions, formatting, and supported media are preserved. Telegram `RichMessage` posts are converted from their rich-text blocks into ordinary text because Bot API inbox updates do not expose that MTProto field as `text`. The existing Supabase inbox remains responsible for the current filtering, cleaning, deduplication, media handling, and footer.
 
 ## Required GitHub Actions secrets
 

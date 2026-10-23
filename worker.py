@@ -74,6 +74,42 @@ def bot_username():
     return data["result"]["username"]
 
 
+def rich_message_text(node, depth=0):
+    """Flatten Telegram RichMessage blocks to their visible text only."""
+    if node is None or depth > 12:
+        return ""
+    if isinstance(node, str):
+        return node
+    if isinstance(node, (list, tuple)):
+        return "\n".join(part for part in (rich_message_text(item, depth + 1) for item in node) if part)
+
+    parts = []
+    for field in ("text", "texts", "title", "subtitle", "caption", "author", "date", "items", "rows", "cells", "blocks"):
+        value = getattr(node, field, None)
+        if value is not None:
+            text = rich_message_text(value, depth + 1)
+            if text and text not in parts:
+                parts.append(text)
+    return "\n".join(parts)
+
+
+def copy_to_bot(client, target, source, message):
+    rich = getattr(message, "rich_message", None)
+    if rich is not None:
+        if getattr(rich, "photos", None) or getattr(rich, "documents", None):
+            raise RuntimeError("RichMessage contains embedded media not supported by the inbox text bridge")
+        text = rich_message_text(getattr(rich, "blocks", None)).strip()
+        if not text:
+            raise RuntimeError("RichMessage contained no extractable text")
+        # Bot API's inbox handler only accepts ordinary text/captions and known
+        # media fields, so convert this new rich-message type to plain text.
+        client.send_message(target, text, parse_mode=None)
+        return
+    # For regular Telegram messages, drop_author copies the complete server-side
+    # payload (including supported media) without a forwarded-from header.
+    client.forward_messages(target, message, from_peer=source, drop_author=True)
+
+
 def main():
     cursor = get_cursor()
     client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
@@ -98,6 +134,7 @@ def main():
                     raise RuntimeError(f"Source message {message_id} was not found")
                 if inspect_only:
                     media = getattr(message, "media", None)
+                    rich = getattr(message, "rich_message", None)
                     raw_message = message.to_dict() if hasattr(message, "to_dict") else {}
                     def shape(value, depth=0):
                         if value is None:
@@ -130,6 +167,7 @@ def main():
                         "message_class": type(message).__name__,
                         "telegram_constructor": raw_message.get("_"),
                         "rich_message_shape": shape(getattr(message, "rich_message", None)),
+                        "rich_text_length": len(rich_message_text(getattr(rich, "blocks", None))) if rich is not None else 0,
                         "present_fields": sorted(
                             key for key, value in raw_message.items()
                             if value is not None and key not in hidden_fields and key != "_"
@@ -141,9 +179,7 @@ def main():
                         "text_length": len(getattr(message, "raw_text", "") or ""),
                     })
                     return
-                client.forward_messages(
-                    target, message, from_peer=source, drop_author=True
-                )
+                copy_to_bot(client, target, source, message)
                 print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id, "copied": True})
                 return
             messages = list(client.iter_messages(source, min_id=cursor, limit=50, reverse=True))
@@ -155,12 +191,7 @@ def main():
                 if not claim(message.id):
                     continue
                 try:
-                    # Telegram's drop_author flag creates a copy without the
-                    # forwarded-from header, preserving the server-side media
-                    # and message payload instead of reducing it to plain text.
-                    client.forward_messages(
-                        target, message, from_peer=source, drop_author=True
-                    )
+                    copy_to_bot(client, target, source, message)
                     finish(message.id, True)
                     copied += 1
                 except Exception:
