@@ -178,6 +178,8 @@ def main():
                         f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo", timeout=30
                     )
                     webhook_info = webhook_response.json().get("result", {}) if webhook_response.ok else {}
+                    source_text = rich_message_text(getattr(rich, "blocks", None)) if rich is not None else ""
+                    clean_source_text = strip_source_promo_footer(source_text)
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
@@ -189,7 +191,11 @@ def main():
                         "message_class": type(message).__name__,
                         "rich_message_class": type(rich).__name__ if rich is not None else None,
                         "rich_block_classes": [type(block).__name__ for block in blocks[:30]],
-                        "rich_text_length": len(rich_message_text(getattr(rich, "blocks", None))) if rich is not None else 0,
+                        "rich_text_length": len(source_text),
+                        "cleaned_rich_text_length": len(clean_source_text),
+                        "source_footer_removed": len(clean_source_text) < len(source_text),
+                        "blocked_channel_phrase_remains": "قناة #اليمن_نت" in clean_source_text,
+                        "source_alias_remains": bool(re.search(r"ALYEMENNET|ALYMENET", clean_source_text, re.IGNORECASE)),
                         "media_class": type(media).__name__ if media is not None else None,
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
