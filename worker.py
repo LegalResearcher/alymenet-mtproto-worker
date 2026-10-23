@@ -77,14 +77,27 @@ def bot_username():
 def main():
     cursor = get_cursor()
     client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
-    forwarded = 0
-    text_fallback = 0
+    copied = 0
     try:
         with client:
             if not client.is_user_authorized():
                 raise RuntimeError("TELEGRAM_SESSION_STRING is not authorized")
             source = client.get_entity(SOURCE)
             target = client.get_entity(bot_username())
+            test_message_id = os.environ.get("TEST_MESSAGE_ID", "").strip()
+            if test_message_id:
+                message_id = int(test_message_id)
+                if message_id <= 0:
+                    raise ValueError("TEST_MESSAGE_ID must be a positive Telegram message ID")
+                result = client.get_messages(source, ids=message_id)
+                message = result[0] if isinstance(result, (list, tuple)) else result
+                if message is None:
+                    raise RuntimeError(f"Source message {message_id} was not found")
+                client.forward_messages(
+                    target, message, from_peer=source, drop_author=True
+                )
+                print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id, "copied": True})
+                return
             messages = list(client.iter_messages(source, min_id=cursor, limit=50, reverse=True))
             messages = [
                 m for m in messages
@@ -94,25 +107,20 @@ def main():
                 if not claim(message.id):
                     continue
                 try:
-                    try:
-                        if message.raw_text:
-                            client.send_message(target, message.raw_text)
-                        else:
-                            client.forward_messages(target, message, from_peer=source)
-                    except Exception:
-                        text = (message.raw_text or "").strip()
-                        if not text:
-                            raise
-                        client.send_message(target, text)
-                        text_fallback += 1
+                    # Telegram's drop_author flag creates a copy without the
+                    # forwarded-from header, preserving the server-side media
+                    # and message payload instead of reducing it to plain text.
+                    client.forward_messages(
+                        target, message, from_peer=source, drop_author=True
+                    )
                     finish(message.id, True)
-                    forwarded += 1
+                    copied += 1
                 except Exception:
                     release(message.id)
                     raise
     finally:
         client.disconnect()
-    print({"source": SOURCE, "cursor": cursor, "inspected": len(messages), "forwarded": forwarded, "text_fallback": text_fallback})
+    print({"source": SOURCE, "cursor": cursor, "inspected": len(messages), "copied": copied})
 
 
 if __name__ == "__main__":
