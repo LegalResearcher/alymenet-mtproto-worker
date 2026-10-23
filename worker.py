@@ -1,5 +1,6 @@
 import os
 import re
+import uuid
 from datetime import datetime, timezone
 
 import requests
@@ -64,6 +65,34 @@ def finish(message_id, ok):
 
 def release(message_id):
     db(f"{STATE_TABLE}?source_message_id=eq.{message_id}", method="DELETE")
+
+
+def delivery_claim(message_id, path, owner):
+    result = db(
+        "rpc/alymenet_delivery_claim",
+        method="POST",
+        payload={"p_message_id": message_id, "p_path": path, "p_owner": owner},
+    ).json()
+    if not isinstance(result, dict):
+        raise RuntimeError(f"Unexpected delivery-claim response for {message_id}")
+    return result
+
+
+def delivery_transition(message_id, path, owner, status, detail=None):
+    result = db(
+        "rpc/alymenet_delivery_transition",
+        method="POST",
+        payload={
+            "p_message_id": message_id,
+            "p_path": path,
+            "p_owner": owner,
+            "p_status": status,
+            "p_target_message_id": None,
+            "p_detail": detail,
+        },
+    ).json()
+    if result is not True:
+        raise RuntimeError(f"Delivery-ledger transition lost claim for {message_id}")
 
 
 def bot_username():
@@ -133,7 +162,7 @@ def strip_source_promo_footer(text):
     return text
 
 
-def copy_to_bot(client, target, source, message, test_nonce=None):
+def copy_to_bot(client, target, source, message):
     rich = getattr(message, "rich_message", None)
     if rich is not None:
         if getattr(rich, "photos", None) or getattr(rich, "documents", None):
@@ -141,8 +170,6 @@ def copy_to_bot(client, target, source, message, test_nonce=None):
         text = strip_source_promo_footer(rich_message_text(getattr(rich, "blocks", None))).strip()
         if not text:
             raise RuntimeError("RichMessage contained no extractable text")
-        if test_nonce:
-            text += f"\nhttps://example.invalid/mtproto-test-{test_nonce}"
         # Bot API's inbox handler only accepts ordinary text/captions and known
         # media fields, so convert this new rich-message type to plain text.
         client.send_message(target, text, parse_mode=None)
@@ -243,9 +270,22 @@ def main():
                         "cleaned_extracted_text": clean_source_text if export_text else None,
                     })
                     return
-                nonce = f"{message_id}-{int(datetime.now(timezone.utc).timestamp())}"
-                copy_to_bot(client, target, source, message, test_nonce=nonce)
-                print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id, "copied": True})
+                owner = str(uuid.uuid4())
+                ledger = delivery_claim(message_id, "mtproto", owner)
+                if not ledger.get("acquired"):
+                    print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id,
+                           "copied": False, "skipped_by_ledger": ledger.get("status")})
+                    return
+                try:
+                    copy_to_bot(client, target, source, message)
+                    delivery_transition(message_id, "mtproto", owner, "mtproto_handoff")
+                    print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id, "copied": True})
+                except Exception as error:
+                    try:
+                        delivery_transition(message_id, "mtproto", owner, "uncertain", str(error))
+                    except Exception as ledger_error:
+                        print({"delivery_ledger_update_error": str(ledger_error), "message_id": message_id})
+                    raise
                 return
             messages = list(client.iter_messages(source, min_id=cursor, limit=50, reverse=True))
             messages = [
@@ -255,11 +295,27 @@ def main():
             for message in messages:
                 if not claim(message.id):
                     continue
+                owner = str(uuid.uuid4())
+                try:
+                    ledger = delivery_claim(message.id, "mtproto", owner)
+                except Exception:
+                    release(message.id)
+                    raise
+                if not ledger.get("acquired"):
+                    finish(message.id, True)
+                    print({"mode": "scheduled", "message_id": message.id,
+                           "skipped_by_ledger": ledger.get("status")})
+                    continue
                 try:
                     copy_to_bot(client, target, source, message)
+                    delivery_transition(message.id, "mtproto", owner, "mtproto_handoff")
                     finish(message.id, True)
                     copied += 1
-                except Exception:
+                except Exception as error:
+                    try:
+                        delivery_transition(message.id, "mtproto", owner, "uncertain", str(error))
+                    except Exception as ledger_error:
+                        print({"delivery_ledger_update_error": str(ledger_error), "message_id": message.id})
                     release(message.id)
                     raise
     finally:
