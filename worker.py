@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import requests
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
+from telethon.tl.patched import MessageService
 
 SOURCE = "ALYEMENNET"
 STATE_TABLE = "alymenet_mtproto_state"
@@ -85,7 +86,10 @@ def main():
             source = client.get_entity(SOURCE)
             target = client.get_entity(bot_username())
             messages = list(client.iter_messages(source, min_id=cursor, limit=50, reverse=True))
-            messages = [m for m in messages if m.id > cursor]
+            messages = [
+                m for m in messages
+                if m.id > cursor and not isinstance(m, MessageService)
+            ]
             for message in messages:
                 if not claim(message.id):
                     continue
