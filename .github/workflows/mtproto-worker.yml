@@ -14,7 +14,7 @@ on:
         type: boolean
         default: false
       probe_bot:
-        description: "Send /start to the bot as a non-publishing webhook probe"
+        description: "Send a blocklisted test phrase to the bot; it must never publish"
         required: false
         type: boolean
         default: false
