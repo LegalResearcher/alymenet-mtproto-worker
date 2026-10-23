@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 
 import requests
-from telethon import TelegramClient
+from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 
 SOURCE = "ALYEMENNET"
