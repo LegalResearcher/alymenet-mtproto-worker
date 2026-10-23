@@ -192,6 +192,18 @@ def main():
                     webhook_info = webhook_response.json().get("result", {}) if webhook_response.ok else {}
                     source_text = rich_message_text(getattr(rich, "blocks", None)) if rich is not None else ""
                     clean_source_text = strip_source_promo_footer(source_text)
+                    blocked_phrases = [
+                        "ALYMENET رابط اليمن نت الرسمي", "قنوات مزورة", "القنوات المزورة", "الصفحات مشبوهة",
+                        "صفحات مشبوهه", "وتنتحل اسم وشعار قناة #اليمن_نت", "تنتحل اسم وشعار قناة #اليمن_نت",
+                        "قنواتهم المزورة", "قنواتهم المزوره", "لذلك وجب التنويه", "لذلك وجب التنوية",
+                        "ونخلي مسؤوليتنا عن اي محتوى", "نخلي مسؤوليتنا عن اي محتوى", "قناة اليمن نت الرئيسية",
+                        "قناة #اليمن_نت الرئيسية", "سجل القناة الرئيسية", "متابعينا الكرام", "يمكنكم متابعة",
+                        "أخبار اليمن نت", "اخبار اليمن نت", "قناتنا الرئيسية", "قناتنا الرئيسيه",
+                        "قناتنا المؤقتة", "القناة مؤقتا", "عبر الرابط", "مصدرك الأول لأخبار #اليمن", "قناة #اليمن_نت",
+                    ]
+                    matched_blocked_phrases = [p for p in blocked_phrases if p.casefold() in clean_source_text.casefold()]
+                    text_without_urls = re.sub(r"(?:https?://|ftp://|www\.)[^\s<>()\[\]{}\"']+", " ", clean_source_text)
+                    bad_filter_match = bool(re.search(r"اليمن[\s\u200b\u200c\u200d_ـ-]*نت|حزام[\s\u200b\u200c\u200d_ـ-]*ال[أا]سد", text_without_urls, re.IGNORECASE))
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
@@ -208,6 +220,8 @@ def main():
                         "source_footer_removed": len(clean_source_text) < len(source_text),
                         "blocked_channel_phrase_remains": "قناة #اليمن_نت" in clean_source_text,
                         "source_alias_remains": bool(re.search(r"ALYEMENNET|ALYMENET", clean_source_text, re.IGNORECASE)),
+                        "matched_blocked_phrases": matched_blocked_phrases,
+                        "bad_filter_match_without_urls": bad_filter_match,
                         "media_class": type(media).__name__ if media is not None else None,
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
