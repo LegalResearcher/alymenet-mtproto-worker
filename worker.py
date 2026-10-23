@@ -111,6 +111,18 @@ def strip_source_promo_footer(text):
             if index > 0 and re.fullmatch(r"ـ{5,}", lines[index - 1].strip()):
                 index -= 1
             return "\n".join(lines[:index]).rstrip()
+    suffix_start = len(lines)
+    while suffix_start > 0:
+        item = lines[suffix_start - 1]
+        if not item.strip() or alias.search(item) or re.search(r"t\.me/", item, re.IGNORECASE) or re.fullmatch(r"[\s\W_]+", item):
+            suffix_start -= 1
+        else:
+            break
+    suffix = lines[suffix_start:]
+    if suffix and any(alias.search(item) for item in suffix) and any(re.search(r"t\.me/", item, re.IGNORECASE) for item in suffix):
+        if suffix_start > 0 and re.fullmatch(r"ـ{5,}", lines[suffix_start - 1].strip()):
+            suffix_start -= 1
+        return "\n".join(lines[:suffix_start]).rstrip()
     return text
 
 
