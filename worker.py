@@ -164,6 +164,7 @@ def main():
                         "mode": "read_only_inspection",
                         "source": SOURCE,
                         "message_id": message_id,
+                        "sender_allowed_by_inbox": str(client.get_me().id) in {"85820797", "1550781818", "672436755"},
                         "message_class": type(message).__name__,
                         "telegram_constructor": raw_message.get("_"),
                         "rich_message_shape": shape(getattr(message, "rich_message", None)),
