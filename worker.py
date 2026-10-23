@@ -85,6 +85,9 @@ def main():
             source = client.get_entity(SOURCE)
             target = client.get_entity(bot_username())
             test_message_id = os.environ.get("TEST_MESSAGE_ID", "").strip()
+            inspect_only = os.environ.get("INSPECT_ONLY", "").lower() in {"1", "true", "yes"}
+            if inspect_only and not test_message_id:
+                raise ValueError("INSPECT_ONLY requires TEST_MESSAGE_ID")
             if test_message_id:
                 message_id = int(test_message_id)
                 if message_id <= 0:
@@ -93,6 +96,19 @@ def main():
                 message = result[0] if isinstance(result, (list, tuple)) else result
                 if message is None:
                     raise RuntimeError(f"Source message {message_id} was not found")
+                if inspect_only:
+                    media = getattr(message, "media", None)
+                    print({
+                        "mode": "read_only_inspection",
+                        "source": SOURCE,
+                        "message_id": message_id,
+                        "message_class": type(message).__name__,
+                        "media_class": type(media).__name__ if media is not None else None,
+                        "media_fields": sorted(vars(media).keys()) if media is not None and hasattr(media, "__dict__") else [],
+                        "has_text": bool(getattr(message, "raw_text", "")),
+                        "text_length": len(getattr(message, "raw_text", "") or ""),
+                    })
+                    return
                 client.forward_messages(
                     target, message, from_peer=source, drop_author=True
                 )

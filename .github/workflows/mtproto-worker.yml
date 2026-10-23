@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: ""
+      inspect_only:
+        description: "Read-only: inspect message/media type without copying"
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "*/5 * * * *"
 
@@ -31,6 +36,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_MESSAGE_ID: ${{ inputs.message_id }}
+      INSPECT_ONLY: ${{ inputs.inspect_only }}
 
     steps:
       - name: Check out repository

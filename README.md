@@ -15,6 +15,6 @@ Add these repository secrets under **Settings → Secrets and variables → Acti
 
 Never commit any of these values to the repository, workflow, issues, or logs.
 
-The workflow runs every five minutes and can also be started manually from the Actions tab. For a one-off test, enter a source `message_id`; the worker copies only that message and does not change the deduplication cursor. Leave the input blank for the normal scheduled batch. GitHub-hosted schedules are best-effort and may be delayed during high load; they are not real-time delivery.
+The workflow runs every five minutes and can also be started manually from the Actions tab. For a one-off test, enter a source `message_id`; the worker copies only that message and does not change the deduplication cursor. Select `inspect_only` with a message ID to print safe type/field metadata without copying it. Leave both inputs blank for the normal scheduled batch. GitHub-hosted schedules are best-effort and may be delayed during high load; they are not real-time delivery.
 
 The Supabase table `alymenet_mtproto_state` stores the source message IDs that have been claimed and copied. It is initialized from the existing publisher history so old posts are not replayed.
