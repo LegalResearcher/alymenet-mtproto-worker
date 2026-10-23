@@ -114,7 +114,7 @@ def strip_source_promo_footer(text):
     return text
 
 
-def copy_to_bot(client, target, source, message):
+def copy_to_bot(client, target, source, message, test_nonce=None):
     rich = getattr(message, "rich_message", None)
     if rich is not None:
         if getattr(rich, "photos", None) or getattr(rich, "documents", None):
@@ -122,6 +122,8 @@ def copy_to_bot(client, target, source, message):
         text = strip_source_promo_footer(rich_message_text(getattr(rich, "blocks", None))).strip()
         if not text:
             raise RuntimeError("RichMessage contained no extractable text")
+        if test_nonce:
+            text += f"\nhttps://example.invalid/mtproto-test-{test_nonce}"
         # Bot API's inbox handler only accepts ordinary text/captions and known
         # media fields, so convert this new rich-message type to plain text.
         client.send_message(target, text, parse_mode=None)
@@ -193,7 +195,8 @@ def main():
                         "text_length": len(getattr(message, "raw_text", "") or ""),
                     })
                     return
-                copy_to_bot(client, target, source, message)
+                nonce = f"{message_id}-{int(datetime.now(timezone.utc).timestamp())}"
+                copy_to_bot(client, target, source, message, test_nonce=nonce)
                 print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id, "copied": True})
                 return
             messages = list(client.iter_messages(source, min_id=cursor, limit=50, reverse=True))
