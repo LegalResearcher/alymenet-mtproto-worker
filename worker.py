@@ -137,12 +137,18 @@ def main():
                     rich = getattr(message, "rich_message", None)
                     blocks = getattr(rich, "blocks", []) if rich is not None else []
                     session_user = client.get_me()
+                    webhook_response = requests.get(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo", timeout=30
+                    )
+                    webhook_info = webhook_response.json().get("result", {}) if webhook_response.ok else {}
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
                         "message_id": message_id,
                         "session_account_is_bot": bool(getattr(session_user, "bot", False)),
                         "target_is_bot": bool(getattr(target, "bot", False)),
+                        "webhook_pending_updates": webhook_info.get("pending_update_count"),
+                        "webhook_last_error_date": webhook_info.get("last_error_date"),
                         "message_class": type(message).__name__,
                         "rich_message_class": type(rich).__name__ if rich is not None else None,
                         "rich_block_classes": [type(block).__name__ for block in blocks[:30]],
