@@ -203,7 +203,9 @@ def main():
                     ]
                     matched_blocked_phrases = [p for p in blocked_phrases if p.casefold() in clean_source_text.casefold()]
                     text_without_urls = re.sub(r"(?:https?://|ftp://|www\.)[^\s<>()\[\]{}\"']+", " ", clean_source_text)
-                    bad_filter_match = bool(re.search(r"اليمن[\s\u200b\u200c\u200d_ـ-]*نت|حزام[\s\u200b\u200c\u200d_ـ-]*ال[أا]سد", text_without_urls, re.IGNORECASE))
+                    bad_yemen_net_match = bool(re.search(r"اليمن[\s\u200b\u200c\u200d_ـ-]*نت", text_without_urls, re.IGNORECASE))
+                    bad_hizam_asad_match = bool(re.search(r"حزام[\s\u200b\u200c\u200d_ـ-]*ال[أا]سد", text_without_urls, re.IGNORECASE))
+                    bad_source_link_match = bool(re.search(r"t\.me/(?:s/)?ALYMENET", text_without_urls, re.IGNORECASE))
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
@@ -221,7 +223,9 @@ def main():
                         "blocked_channel_phrase_remains": "قناة #اليمن_نت" in clean_source_text,
                         "source_alias_remains": bool(re.search(r"ALYEMENNET|ALYMENET", clean_source_text, re.IGNORECASE)),
                         "matched_blocked_phrases": matched_blocked_phrases,
-                        "bad_filter_match_without_urls": bad_filter_match,
+                        "bad_yemen_net_match": bad_yemen_net_match,
+                        "bad_hizam_asad_match": bad_hizam_asad_match,
+                        "bad_source_link_match": bad_source_link_match,
                         "media_class": type(media).__name__ if media is not None else None,
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
