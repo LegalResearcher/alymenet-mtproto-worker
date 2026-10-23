@@ -164,6 +164,9 @@ def main():
             target = client.get_entity(bot_username())
             test_message_id = os.environ.get("TEST_MESSAGE_ID", "").strip()
             inspect_only = os.environ.get("INSPECT_ONLY", "").lower() in {"1", "true", "yes"}
+            export_text = os.environ.get("EXPORT_TEXT", "").lower() in {"1", "true", "yes"}
+            if export_text and not inspect_only:
+                raise ValueError("EXPORT_TEXT requires INSPECT_ONLY")
             probe_bot = os.environ.get("PROBE_BOT", "").lower() in {"1", "true", "yes"}
             if probe_bot:
                 if test_message_id or inspect_only:
@@ -236,6 +239,7 @@ def main():
                         "media_class": type(media).__name__ if media is not None else None,
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
+                        "extracted_text": clean_source_text if export_text else None,
                     })
                     return
                 nonce = f"{message_id}-{int(datetime.now(timezone.utc).timestamp())}"
