@@ -188,8 +188,10 @@ def main():
                         "bot_webhook": {
                             "points_to_inbox": str(webhook_data.get("url", "")).endswith("/functions/v1/alymenet-bot-inbox"),
                             "pending_update_count": webhook_data.get("pending_update_count"),
+                            "allowed_updates": webhook_data.get("allowed_updates"),
                             "last_error_date": webhook_data.get("last_error_date"),
                             "has_last_error": bool(webhook_data.get("last_error_message")),
+                            "last_error_message": str(webhook_data.get("last_error_message", "")).replace(str(webhook_data.get("url", "")), "[webhook-url]")[:180],
                         },
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
