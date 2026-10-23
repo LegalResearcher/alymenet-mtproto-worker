@@ -160,6 +160,11 @@ def main():
                         value = getattr(message, field, None)
                         if value is not None:
                             optional_objects[field] = type(value).__name__
+                    bot_history = client.get_messages(target, limit=3)
+                    webhook_response = requests.get(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo", timeout=30
+                    )
+                    webhook_data = webhook_response.json().get("result", {}) if webhook_response.ok else {}
                     print({
                         "mode": "read_only_inspection",
                         "source": SOURCE,
@@ -176,6 +181,16 @@ def main():
                         "media_class": type(media).__name__ if media is not None else None,
                         "media_fields": sorted(vars(media).keys()) if media is not None and hasattr(media, "__dict__") else [],
                         "optional_object_classes": optional_objects,
+                        "bot_chat_recent": [
+                            {"id": item.id, "outgoing": bool(item.out), "text_length": len(item.raw_text or "")}
+                            for item in bot_history
+                        ],
+                        "bot_webhook": {
+                            "points_to_inbox": str(webhook_data.get("url", "")).endswith("/functions/v1/alymenet-bot-inbox"),
+                            "pending_update_count": webhook_data.get("pending_update_count"),
+                            "last_error_date": webhook_data.get("last_error_date"),
+                            "has_last_error": bool(webhook_data.get("last_error_message")),
+                        },
                         "has_text": bool(getattr(message, "raw_text", "")),
                         "text_length": len(getattr(message, "raw_text", "") or ""),
                     })
