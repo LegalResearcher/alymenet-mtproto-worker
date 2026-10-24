@@ -350,7 +350,7 @@ def main():
                            "skipped_by_ledger": ledger.get("status")})
                     continue
                 try:
-                    delay = 1.1 - (time.monotonic() - last_send_at) if last_send_at else 0.0
+                    delay = 60.1 - (time.monotonic() - last_send_at) if last_send_at else 0.0
                     if delay > 0:
                         time.sleep(delay)
                     delivered = copy_to_bot(client, target, source, message, photos_enabled=photos_enabled)
