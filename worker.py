@@ -345,6 +345,11 @@ def main():
                     release(message.id)
                     raise
                 if not ledger.get("acquired"):
+                    if ledger.get("status") == "interval_wait":
+                        release(message.id)
+                        print({"mode": "scheduled", "message_id": message.id,
+                               "waiting_for_interval": True})
+                        break
                     finish(message.id, True)
                     print({"mode": "scheduled", "message_id": message.id,
                            "skipped_by_ledger": ledger.get("status")})
