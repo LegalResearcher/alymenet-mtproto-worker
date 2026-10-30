@@ -21,6 +21,8 @@ During a timed pause, the scheduled workers stay active but the shared delivery 
 
 The bot command router lives in Supabase (`alymenet-bot-router`); the GitHub worker consumes the same shared delivery policy from Supabase.
 
+Send `الأوامر`, `/commands`, `/help`, or `/start` in the bot's private chat to show the command guide and a persistent reply-keyboard with common shortcuts. Numbered buttons are examples; replace the number in the message text to choose another duration or schedule. `إخفاء القائمة` removes the keyboard.
+
 ## Required GitHub Actions secrets
 
 Add these repository secrets under **Settings → Secrets and variables → Actions**:
