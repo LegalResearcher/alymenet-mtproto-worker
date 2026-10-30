@@ -15,7 +15,8 @@ Send commands to the bot as plain text, without quotation marks:
 - Replace `10` with another duration, such as `30` or `120`, to set the pause duration. The accepted pause is 1–10080 minutes.
 - `جدولة 20`, `جدولة20`, `جدوله 20`, or `جدوله20` — set the interval between publishing cycles to 20 minutes. The number is not a delay between individual posts inside a cycle. The accepted cycle interval is 1–10080 minutes.
 - `ايقاف جدولة` or `ايقاف جدوله` — reset the custom cycle interval to the normal defaults: direct publisher every 15 seconds and MTProto every 5 minutes. This command changes schedule only; it does not turn publishing on or off.
-- The existing `تشغيل يمن نت` command remains supported and restores legacy mode. `ايقاف يمن نت` still stops publishing until manually enabled. `تشغيل فيديو` and `ايقاف فيديو` remain supported.
+- `تشغيل صور` and `ايقاف صور` enable or disable photo publishing using the same setting as the legacy `on` and `off` commands; those legacy aliases remain supported. `تشغيل فيديو` and `ايقاف فيديو` remain supported.
+- The existing `تشغيل يمن نت` command remains supported and restores legacy mode. `ايقاف يمن نت` still stops publishing until manually enabled.
 
 During a timed pause, the scheduled workers stay active but the shared delivery gate blocks all sends. In `بدون` mode, source IDs observed during the pause are added to the cutoff. In accumulated mode, the first eligible delivery after the pause starts the one-minute spacing gate. Unknown strings beginning with `تشغيل يمن نت` or `ايقاف يمن نت` receive command guidance rather than being passed to the inbox as publishable text.
 
