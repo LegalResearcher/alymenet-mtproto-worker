@@ -112,6 +112,16 @@ def source_photos_enabled():
     return rows[0].get("enabled") is True if rows else True
 
 
+def international_news_enabled():
+    rows = db(
+        "alymenet_bot_settings?setting_key=eq.international_news_enabled&select=enabled&limit=1"
+    ).json()
+    if not rows:
+        return True
+    value = rows[0].get("enabled")
+    return value is not False and str(value).lower() != "false"
+
+
 def rich_message_text(node, depth=0):
     """Flatten Telegram RichMessage blocks to their visible text only."""
     if node is None or depth > 12:
@@ -168,6 +178,28 @@ def strip_source_promo_footer(text):
             footer_start -= 1
         return "\n".join(lines[:footer_start]).rstrip()
     return text
+
+
+def scope_filter_decision(message):
+    if international_news_enabled():
+        return None
+
+    rich = getattr(message, "rich_message", None)
+    text = rich_message_text(getattr(rich, "blocks", None)) if rich is not None else (
+        getattr(message, "raw_text", "") or ""
+    )
+    text = strip_source_promo_footer(text).strip()
+    response = requests.post(
+        f"{SUPABASE_URL}/functions/v1/alymenet-filter-gateway?classify_only=1",
+        headers=DB_HEADERS,
+        json={"text": text},
+        timeout=25,
+    )
+    response.raise_for_status()
+    decision = response.json()
+    if not isinstance(decision, dict) or decision.get("action") not in {"publish", "reject", "review"}:
+        raise RuntimeError("Topic classifier returned an invalid decision")
+    return None if decision["action"] == "publish" else decision
 
 
 def is_image_message(message):
@@ -316,6 +348,17 @@ def main():
                            "copied": False, "skipped_by_ledger": ledger.get("status")})
                     return
                 try:
+                    decision = scope_filter_decision(message)
+                    if decision is not None:
+                        detail = (
+                            f"scope={decision['action']}; topic={decision.get('topic', 'غير محدد')}; "
+                            f"reason={decision.get('reason', 'غير محدد')}"
+                        )
+                        delivery_transition(message_id, "mtproto", owner, "skipped", detail)
+                        print({"mode": "single_message_test", "source": SOURCE, "message_id": message_id,
+                               "copied": False, "filtered": True, "action": decision["action"],
+                               "topic": decision.get("topic")})
+                        return
                     delivered = copy_to_bot(client, target, source, message, photos_enabled=photos_enabled)
                     status = "mtproto_handoff" if delivered else "skipped"
                     detail = None if delivered else "Photos are disabled and the source post has no text caption"
@@ -356,6 +399,17 @@ def main():
                            "skipped_by_ledger": ledger.get("status")})
                     continue
                 try:
+                    decision = scope_filter_decision(message)
+                    if decision is not None:
+                        detail = (
+                            f"scope={decision['action']}; topic={decision.get('topic', 'غير محدد')}; "
+                            f"reason={decision.get('reason', 'غير محدد')}"
+                        )
+                        delivery_transition(message.id, "mtproto", owner, "skipped", detail)
+                        finish(message.id, True)
+                        print({"mode": "scheduled", "message_id": message.id, "filtered": True,
+                               "action": decision["action"], "topic": decision.get("topic")})
+                        continue
                     delay = 60.1 - (time.monotonic() - last_send_at) if last_send_at else 0.0
                     if delay > 0:
                         time.sleep(delay)
