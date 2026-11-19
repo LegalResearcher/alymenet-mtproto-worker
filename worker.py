@@ -180,6 +180,24 @@ def strip_source_promo_footer(text):
     return text
 
 
+_SOURCE_EMOJI_START = re.compile(r"[\U0001F000-\U0001FAFF\u2300-\u23FF\u2600-\u27BF\u2B00-\u2BFF]")
+_LEADING_SOURCE_EMOJI = re.compile(
+    r"^(?:[\U0001F000-\U0001FAFF\u2300-\u23FF\u2600-\u27BF\u2B00-\u2BFF\uFE0E\uFE0F\u200D\U0001F3FB-\U0001F3FF]+[\t \r\n]*)+"
+)
+
+
+def has_leading_source_marker(text):
+    stripped = text.lstrip(" \t\r\n")
+    return bool(stripped and _SOURCE_EMOJI_START.match(stripped[0]))
+
+
+def replace_leading_source_marker(text):
+    if not has_leading_source_marker(text):
+        return text
+    body = _LEADING_SOURCE_EMOJI.sub("", text.lstrip(" \t\r\n"), count=1).lstrip(" \t\r\n")
+    return f"🔴 {body}" if body else "🔴"
+
+
 def scope_filter_decision(message):
     if international_news_enabled():
         return None
@@ -228,6 +246,7 @@ def copy_to_bot(client, target, source, message, photos_enabled=True):
             if rich_has_media and not photos_enabled:
                 return False
             raise RuntimeError("RichMessage contained no extractable text")
+        text = replace_leading_source_marker(text)
         # Bot API's inbox handler only accepts ordinary text/captions and known
         # media fields, so convert this new rich-message type to plain text.
         client.send_message(target, text, parse_mode=None)
@@ -236,6 +255,7 @@ def copy_to_bot(client, target, source, message, photos_enabled=True):
         text = strip_source_promo_footer(getattr(message, "raw_text", "") or "").strip()
         if not text:
             return False
+        text = replace_leading_source_marker(text)
         client.send_message(target, text, parse_mode=None)
         return True
     # For regular Telegram messages, drop_author copies the complete server-side
